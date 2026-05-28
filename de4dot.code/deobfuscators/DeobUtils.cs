@@ -32,9 +32,18 @@ namespace de4dot.code.deobfuscators {
 		public static void DecryptAndAddResources(ModuleDef module, string encryptedName, Func<byte[]> decryptResource) {
 			Logger.v("Decrypting resources, name: {0}", Utils.ToCsharpString(encryptedName));
 			var decryptedResourceData = decryptResource();
-			if (decryptedResourceData == null)
-				throw new ApplicationException("decryptedResourceData is null");
-			var resourceModule = ModuleDefMD.Load(decryptedResourceData);
+			if (decryptedResourceData == null) {
+				Logger.w("Could not decrypt resource: {0}", Utils.ToCsharpString(encryptedName));
+				return;
+			}
+			ModuleDefMD resourceModule;
+			try {
+				resourceModule = ModuleDefMD.Load(decryptedResourceData);
+			}
+			catch (Exception ex) {
+				Logger.w("Could not load decrypted resource as module: {0}: {1}", Utils.ToCsharpString(encryptedName), ex.Message);
+				return;
+			}
 
 			Logger.Instance.Indent();
 			foreach (var rsrc in resourceModule.Resources) {
