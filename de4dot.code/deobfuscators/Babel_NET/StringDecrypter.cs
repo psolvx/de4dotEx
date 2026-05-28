@@ -334,14 +334,26 @@ namespace de4dot.code.deobfuscators.Babel_NET {
 				if (switchIns == null)
 					return;
 
-				for (int i = 0; i < method.Body.Instructions.IndexOf(switchIns); i++) {
-					if (method.Body.Instructions[i].OpCode.Code is Code.Bge or Code.Bge_S) {
-						_skipSwitchLoopIndex = method.Body.Instructions.IndexOf((Instruction)method.Body.Instructions[i].Operand);
-						break;
+				// Try to find the branch instruction that skips the switch loop
+				// Babel v10/v11 uses Bge/Bge_S, but other versions or variants may use different branches
+				var branchCodes = new[] { Code.Bge, Code.Bge_S, Code.Bgt, Code.Bgt_S, Code.Ble, Code.Ble_S, Code.Blt, Code.Blt_S, Code.Bgt_Un, Code.Bgt_Un_S, Code.Ble_Un, Code.Ble_Un_S, Code.Blt_Un, Code.Blt_Un_S };
+				int switchIndex = method.Body.Instructions.IndexOf(switchIns);
+
+				for (int i = 0; i < switchIndex; i++) {
+					if (branchCodes.Contains(method.Body.Instructions[i].OpCode.Code)) {
+						var target = (Instruction)method.Body.Instructions[i].Operand;
+						int targetIndex = method.Body.Instructions.IndexOf(target);
+						// Only use this branch if it jumps past the switch (to skip the loop)
+						if (targetIndex > switchIndex) {
+							_skipSwitchLoopIndex = targetIndex;
+							break;
+						}
 					}
 				}
+
+				// If we couldn't find the expected pattern, skip special switch handling
 				if (_skipSwitchLoopIndex == -1)
-					throw new Exception("decrypterBuilderMethod analysis failed");
+					return;
 
 				int x = 0;
 				_xorValues = new byte[((Instruction[])switchIns.Operand).Length];
